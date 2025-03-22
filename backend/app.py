@@ -13,7 +13,7 @@ from flask_migrate import Migrate
 import requests
 from datetime import datetime, timedelta
 import os 
-
+import psycopg2
 app = Flask(__name__)
 CORS(app)  
 
@@ -82,13 +82,20 @@ class CityCost(db.Model):
         }
 
 
+import enum
+
+class TransactionType(enum.Enum):
+    EARNING = "Earning"
+    DEDUCTION = "Deduction"
+
 class SalaryTransaction(db.Model):
     transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
-    type = db.Column(db.Enum('Earning', 'Deduction'), nullable=False)
+    type = db.Column(db.Enum(TransactionType), nullable=False)  # Correct usage
     description = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
