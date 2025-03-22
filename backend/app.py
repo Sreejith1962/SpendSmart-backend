@@ -17,8 +17,7 @@ import psycopg2
 app = Flask(__name__)
 CORS(app)  
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:iVhR33z1tWtYtnxH@primly-peaceable-mako.data-1.use1.tembo.io:5432/postgres"
-
+app.config['SQLALCHEMY_DATABASE_URI'] = "DATABASE_URI"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
