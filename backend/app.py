@@ -12,12 +12,12 @@ from datetime import datetime, timezone
 from flask_migrate import Migrate
 import requests
 from datetime import datetime, timedelta
-from os import os 
+import os 
 
 app = Flask(__name__)
 CORS(app)  
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL",'sqlite:///default.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
