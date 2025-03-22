@@ -1,0 +1,10 @@
+Flask
+flask_sqlalchemy
+flask_cors
+werkzeug
+numpy
+pandas
+yfinance
+pandas_datareader
+scipy
+gunicorn
