@@ -8,15 +8,21 @@ import pandas as pd
 import yfinance as yf
 from pandas_datareader import data as pdr
 from scipy.optimize import minimize
+from datetime import datetime, timezone
+from flask_migrate import Migrate
+import requests
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)  
-CORS(app, origins="*")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///financial_literacy.db'  
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)  # Now initialized correctly
+
+
 
 
 class User(db.Model):
@@ -26,7 +32,7 @@ class User(db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     experience_points = db.Column(db.Integer, default=0)
     credit_score = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     location = db.Column(db.String(100), nullable=False)
     salary = db.Column(db.Numeric(10, 2), default=0)
 
@@ -53,11 +59,25 @@ class Goal(db.Model):
     amount = db.Column(db.Numeric(10, 2), nullable=False)
 
 
-class LivingCost(db.Model):
-    location_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    location_name = db.Column(db.String(100), unique=True, nullable=False)
-    average_cost = db.Column(db.Numeric(10, 2), nullable=False)
-    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+
+class CityCost(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    city_name = db.Column(db.String(100), unique=True, nullable=False)
+    rent_min = db.Column(db.Numeric(10, 2), nullable=False)
+    rent_max = db.Column(db.Numeric(10, 2), nullable=False)
+    salary_min = db.Column(db.Numeric(10, 2), nullable=False)
+    salary_max = db.Column(db.Numeric(10, 2), nullable=False)
+    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            "city_name": self.city_name,
+            "rent_min": float(self.rent_min),
+            "rent_max": float(self.rent_max),
+            "salary_min": float(self.salary_min),
+            "salary_max": float(self.salary_max),
+            "last_updated": self.last_updated.strftime("%Y-%m-%d %H:%M:%S"),
+        }
 
 
 class SalaryTransaction(db.Model):
@@ -66,11 +86,94 @@ class SalaryTransaction(db.Model):
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     type = db.Column(db.Enum('Earning', 'Deduction'), nullable=False)
     description = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc))
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db.session.remove()  
+
+
+RAPID_API_KEY = "48a15926f9msh4d5dee488a67d77p1d2717jsn2e3367a9a578"
+RAPID_API_HOST = "cost-of-living-and-prices.p.rapidapi.com"
+
+def fetch_city_data(city_name):
+    """Fetch data from RapidAPI and update the database if needed."""
+    
+    city = CityCost.query.filter_by(city_name=city_name).first()
+    
+    
+    if city and city.last_updated > datetime.now(timezone.utc) - timedelta(days=30):
+        print(f"Data for {city_name} is up-to-date.")
+        return
+
+    url = f"https://{RAPID_API_HOST}/prices"
+    params = {"city_name": city_name, "country_name": "India"}
+    headers = {
+        "x-rapidapi-key": RAPID_API_KEY,
+        "x-rapidapi-host": RAPID_API_HOST,
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        resdata = response.json()
+
+        rent_min = next((item["min"] for item in resdata["prices"] if item["item_name"] == "One bedroom apartment outside of city centre"), None)
+        rent_max = next((item["max"] for item in resdata["prices"] if item["item_name"] == "Three bedroom apartment in city centre"), None)
+        salary_min = next((item["min"] for item in resdata["prices"] if item["item_name"] == "Average Monthly Net Salary, After Tax"), None)
+        salary_max = next((item["max"] for item in resdata["prices"] if item["item_name"] == "Average Monthly Net Salary, After Tax"), None)
+
+        if rent_min is None or rent_max is None or salary_min is None or salary_max is None:
+            print(f"Error: Missing data for {city_name}")
+            return
+        
+        
+        if city:
+            city.rent_min = rent_min
+            city.rent_max = rent_max
+            city.salary_min = salary_min
+            city.salary_max = salary_max
+            city.last_updated = datetime.now(timezone.utc)
+        else:
+            city = CityCost(
+                city_name=city_name,
+                rent_min=rent_min,
+                rent_max=rent_max,
+                salary_min=salary_min,
+                salary_max=salary_max,
+            )
+            db.session.add(city)
+
+        db.session.commit()
+        print(f"Updated data for {city_name}")
+
+    except Exception as e:
+        print("Error fetching city data:", e)
+
+
+@app.route("/cities", methods=["GET"])
+def get_cities():
+    for city in ["Delhi", "Bangalore", "Kochi"]:
+        fetch_city_data(city)
+    cities = CityCost.query.all()
+    return jsonify([city.to_dict() for city in cities]), 200
+
+@app.route("/update-city", methods=["POST"])
+def update_city():
+    data = request.json
+    user_id = data.get("user_id")
+    city_name = data.get("city_name")
+
+    if not user_id or not city_name:
+        return jsonify({"error": "Missing user_id or city_name"}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user.location = city_name
+    db.session.commit()
+
+    return jsonify({"message": "City updated successfully", "city": city_name}), 200
 
 @app.route('/register', methods=['POST'])
 def register():
