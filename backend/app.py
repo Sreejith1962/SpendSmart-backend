@@ -102,7 +102,7 @@ def fetch_city_data(city_name):
     city = CityCost.query.filter_by(city_name=city_name).first()
     
     
-    if city and city.last_updated > datetime.now(timezone.utc) - timedelta(days=30):
+    if city and city.last_updated.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) - timedelta(days=30):
         print(f"Data for {city_name} is up-to-date.")
         return
 
@@ -152,7 +152,7 @@ def fetch_city_data(city_name):
 
 @app.route("/cities", methods=["GET"])
 def get_cities():
-    for city in ["Delhi", "Bangalore", "Kochi"]:
+    for city in ["Delhi", "Bengaluru", "Kochi"]:
         fetch_city_data(city)
     cities = CityCost.query.all()
     return jsonify([city.to_dict() for city in cities]), 200
