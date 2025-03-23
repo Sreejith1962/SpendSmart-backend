@@ -17,7 +17,7 @@ import psycopg2
 app = Flask(__name__)
 CORS(app)  
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "DATABASE_URI"
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:iVhR33z1tWtYtnxH@primly-peaceable-mako.data-1.use1.tembo.io:5432/postgres"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -190,8 +190,8 @@ def register():
     new_user = User(username=data['username'], password=hashed_password, email=data['email'], location=data['location'])
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({'message': 'User registered successfully'}), 201
-
+    user = User.query.filter_by(username=data['username']).first()
+    return jsonify({'message': 'User registered successfully','user_id':user.user_id}), 201
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
