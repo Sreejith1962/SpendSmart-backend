@@ -186,12 +186,21 @@ def update_city():
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
+    if not data or "username" not in data or "password" not in data:
+        return jsonify({"message": "Invalid request"}), 400
+
     hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
     new_user = User(username=data['username'], password=hashed_password, email=data['email'], location=data['location'])
     db.session.add(new_user)
     db.session.commit()
+    
+    # Ensure user_id exists in DB
     user = User.query.filter_by(username=data['username']).first()
-    return jsonify({'message': 'User registered successfully','user_id':user.user_id}), 201
+    if not user or not user.user_id:
+        return jsonify({"message": "User ID generation failed"}), 500
+    
+    print(f"New user created: {user.username}, ID: {user.user_id}")  # Debugging
+    return jsonify({"message": "User registered successfully", "user_id": user.user_id}), 201
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
