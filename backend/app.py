@@ -95,6 +95,33 @@ class SalaryTransaction(db.Model):
     description = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime, default=datetime.now(timezone.utc))
 
+@app.route('/city-cost', methods=['GET'])
+def get_city_cost():
+    city_name = request.args.get("city")
+    city = CityCost.query.filter_by(city_name=city_name).first()
+
+    if not city:
+        return jsonify({"message": "City not found"}), 404
+
+    return jsonify({
+        "city": city.city_name,
+        "rent_min": float(city.rent_min),
+        "rent_max": float(city.rent_max),
+        "salary_min": float(city.salary_min),
+        "salary_max": float(city.salary_max)
+    })
+@app.route('/update-user-salary', methods=['POST'])
+def update_user_salary():
+    data = request.json
+    user = User.query.get(data["user_id"])
+
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    user.salary = data["salary"]
+    db.session.commit()
+
+    return jsonify({"message": "Salary updated successfully", "new_salary": user.salary})
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):
