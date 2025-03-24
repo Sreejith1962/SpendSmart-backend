@@ -25,7 +25,7 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Now initialized correctly
 DATABASE_URL=os.getenv("DATABASE_URL")
 print(DATABASE_URL)
-
+API_KEY=os.getenv("API_KEY")
 
 
 class User(db.Model):
