@@ -17,14 +17,14 @@ import psycopg2
 import openai
 app = Flask(__name__)
 CORS(app)  
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:iVhR33z1tWtYtnxH@primly-peaceable-mako.data-1.use1.tembo.io:5432/postgres"
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Now initialized correctly
-DATABASE_URL=os.getenv("DATABASE_URL")
-print(DATABASE_URL)
+
 
 
 class User(db.Model):
