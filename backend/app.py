@@ -14,6 +14,7 @@ import requests
 from datetime import datetime, timedelta
 import os 
 import psycopg2
+import openai
 app = Flask(__name__)
 CORS(app)  
 
@@ -22,7 +23,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Now initialized correctly
-
+DATABASE_URL=os.getenv("DATABASE_URL")
+print(DATABASE_URL)
 
 
 
@@ -81,6 +83,28 @@ class CityCost(db.Model):
         }
 
 
+
+
+
+client = openai.OpenAI(api_key=open('API_KEY').read())
+
+system_prompt = "You are a financial assistant. Only answer financial questions."
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_input = data.get('message', '')
+
+    response = client.chat.completions.create(
+        model='ft:gpt-3.5-turbo-0125:personal::AsBvPrxO',  
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input}
+        ]
+    )
+
+    assistant_response = response.choices[0].message.content.strip()
+    return jsonify({"response": assistant_response})
 import enum
 
 class TransactionType(enum.Enum):
